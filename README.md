@@ -20,6 +20,7 @@
 * [Quickstart](#quickstart)
 * [Write a program](#write-a-program)
 * [Milestones](#milestones)
+* [Documentation](#documentation)
 * [Bugs](#bugs)
 * [Dependencies](#dependencies)
 * [Make](#make)
@@ -49,6 +50,9 @@ Everything is explained in that repository.
 - [ ] Data segment
 - [ ] Custom file descriptors system (file I/O)
 - [ ] Loading in shared libraries
+
+## Documentation
+Coming soon.
 
 ## Bugs
 If you find any bugs, please create an issue and report them.

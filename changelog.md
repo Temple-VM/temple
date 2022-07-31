@@ -1,4 +1,4 @@
 # Changelog
 All the versions and the changes they bring
 
-- `1.0.0`: First commit
+- `1.0.0`: First release with basic instructions, conditions and terminal output
