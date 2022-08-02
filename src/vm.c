@@ -39,10 +39,10 @@ void vm_dump(vm_t *p_vm, FILE *p_stream) {
 }
 
 void vm_panic(vm_t *p_vm, err_t p_err) {
-	set_fg_color(COLOR_BRIGHT_RED, stderr);
+	set_fg_color(COLOR_BRIGHT_RED);
 
 	fputs(ERR_PREFIX, stderr);
-	set_fg_color(COLOR_DEFAULT, stderr);
+	set_fg_color(COLOR_DEFAULT);
 
 	switch (p_err) {
 	case ERR_STACK_OVERFLOW:      fputs("Stack overflow\n",  stderr); break;
@@ -59,13 +59,13 @@ void vm_panic(vm_t *p_vm, err_t p_err) {
 	default: fputs(ERR_PREFIX"Unknown error\n", stderr);
 	}
 
-	set_fg_color(COLOR_DEFAULT, stderr);
+	set_fg_color(COLOR_DEFAULT);
 	fputs("  -> at instruction ", stderr);
 
-	set_fg_color(COLOR_BRIGHT_CYAN, stderr);
+	set_fg_color(COLOR_BRIGHT_CYAN);
 	fprintf(stderr, "$%017lx\n", (long)*p_vm->ip);
 
-	set_fg_color(COLOR_DEFAULT, stderr);
+	set_fg_color(COLOR_DEFAULT);
 
 	/* debug
 	fputs("\nDebug:\n", stderr);

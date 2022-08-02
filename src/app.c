@@ -29,10 +29,10 @@ void fatal(const char *p_fmt, ...) {
 	vsnprintf(msg, sizeof(msg), p_fmt, args);
 	va_end(args);
 
-	set_fg_color(COLOR_BRIGHT_RED, stderr);
+	set_fg_color(COLOR_BRIGHT_RED);
 	fputs("Error: ", stderr);
 
-	set_fg_color(COLOR_DEFAULT, stderr);
+	set_fg_color(COLOR_DEFAULT);
 	fprintf(stderr, "%s\nTry 'temple -h'\n", msg);
 
 	exit(EXIT_FAILURE);

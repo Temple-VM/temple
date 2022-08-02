@@ -1,7 +1,7 @@
 #ifndef COLORS_H__HEADER_GUARD__
 #define COLORS_H__HEADER_GUARD__
 
-#include <stdio.h>  /* FILE, fputs */
+#include <stdio.h>  /* stdout, fputs */
 #include <assert.h> /* assert*/
 
 #include "platform.h"
@@ -28,6 +28,6 @@ typedef enum {
 	COLOR_BRIGHT_WHITE,
 } color_t;
 
-void set_fg_color(color_t p_color, FILE *p_stream);
+void set_fg_color(color_t p_color);
 
 #endif
