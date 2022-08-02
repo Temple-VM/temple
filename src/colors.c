@@ -1,4 +1,4 @@
-#include "color.h"
+#include "colors.h"
 
 void set_fg_color(color_t p_color, FILE *p_stream) {
 #ifdef PLATFORM_LINUX

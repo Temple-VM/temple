@@ -8,7 +8,7 @@
 #include <assert.h> /* assert */
 #include <stdint.h> /* uint8_t, uint64_t */
 
-#include "color.h"
+#include "colors.h"
 #include "vm.h"
 
 #define VERSION_MAJOR 1

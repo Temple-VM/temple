@@ -28,7 +28,7 @@ void vm_dump(vm_t *p_vm, FILE *p_stream) {
 		fputs("EMPTY", p_stream);
 	else {
 		for (size_t i = p_vm->regs[REG_SB]; i < *p_vm->sp; ++ i) {
-			if (i >= 8 && i % 12 == 0)
+			if (i != 0 && i % 12 == 0)
 				fputc('\n', p_stream);
 
 			fprintf(p_stream, "%02x ", p_vm->stack[i]);
@@ -41,15 +41,18 @@ void vm_dump(vm_t *p_vm, FILE *p_stream) {
 void vm_panic(vm_t *p_vm, err_t p_err) {
 	set_fg_color(COLOR_BRIGHT_RED, stderr);
 
+	fputs(ERR_PREFIX, stderr);
+	set_fg_color(COLOR_DEFAULT, stderr);
+
 	switch (p_err) {
-	case ERR_STACK_OVERFLOW:      fputs(ERR_PREFIX"Stack overflow\n",  stderr); break;
-	case ERR_STACK_UNDERFLOW:     fputs(ERR_PREFIX"Stack underflow\n", stderr); break;
-	case ERR_UNKNOWN_INSTRUCTION: fprintf(stderr, ERR_PREFIX"Unknown instruction $%02x\n",
+	case ERR_STACK_OVERFLOW:      fputs("Stack overflow\n",  stderr); break;
+	case ERR_STACK_UNDERFLOW:     fputs("Stack underflow\n", stderr); break;
+	case ERR_UNKNOWN_INSTRUCTION: fprintf(stderr, "Unknown instruction $%02x\n",
 	                                      p_vm->program[*p_vm->ip].opcode); break;
-	case ERR_INVALID_ACCESS: fputs(ERR_PREFIX"Invalid access\n",   stderr); break;
-	case ERR_DIV_BY_ZERO:    fputs(ERR_PREFIX"Division by zero\n", stderr); break;
+	case ERR_INVALID_ACCESS: fputs("Invalid access\n",   stderr); break;
+	case ERR_DIV_BY_ZERO:    fputs("Division by zero\n", stderr); break;
 	case ERR_WRITE_TO_READ_ONLY:
-		fputs(ERR_PREFIX"Attempt to write into read-only memory\n", stderr);
+		fputs("Attempt to write into read-only memory\n", stderr);
 
 		break;
 

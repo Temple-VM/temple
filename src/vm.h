@@ -10,7 +10,7 @@
 #include <string.h>  /* memset, memcpy */
 #include <assert.h>  /* assert */
 
-#include "color.h"
+#include "colors.h"
 
 /* in bytes */
 #define STACK_SIZE 0xFFFF
