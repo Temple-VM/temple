@@ -40,7 +40,7 @@ $ ./bin/app
 
 ## Write a program
 Since you probably do not want to write programs in binary (i know i do not), you can install the
-[Temple Assembler](https://github.com/lordoftrident/tmasm) to write and compile Temple programs.
+[Temple Assembler](https://github.com/Temple-VM/tmasm) to write and compile Temple programs.
 Everything is explained in that repository.
 
 ## Milestones
