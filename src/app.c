@@ -9,7 +9,7 @@ void help(void) {
 	     " \\\\_/\\\\____/\\_| ||_/\\_|   \\___||/\\____/\n"
 	     " ||   |/        ||            //     ||\n"
 	     "\n"
-	     "Github: https://github.com/lordoftrident/temple\n"
+	     "Github: https://github.com/Temple-VM/temple\n"
 	     "\n"
 	     "Usage: temple [OPTIONS] [FILE [ARG...]]\n"
 	     "OPTIONS:\n"
