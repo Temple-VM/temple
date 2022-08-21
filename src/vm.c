@@ -5,18 +5,80 @@ void vm_init(vm_t *p_vm) {
 
 	p_vm->ip = &p_vm->regs[REG_IP];
 	p_vm->sp = &p_vm->regs[REG_SP];
+
+	p_vm->program = NULL;
 }
 
-int vm_exec(vm_t *p_vm, inst_t *p_program, word_t p_program_size, word_t p_entry_point) {
-	p_vm->program      = p_program;
-	p_vm->program_size = p_program_size;
+void vm_load_from_file(vm_t *p_vm, const char *p_path) {
+	assert(sizeof(word_t) == 8);
 
-	for (*p_vm->ip = p_entry_point; !p_vm->halt; ++ *p_vm->ip) {
+	if (p_vm->program != NULL)
+		SMEMFREE(p_vm->program);
+
+	FILE *file = fopen(p_path, "r");
+	if (file == NULL)
+		fatal("Could not open file "QUOTES("%s"), p_path);
+
+	/* skip the shebang */
+	char ch = fgetc(file);
+	if (ch == '#')
+		while (fgetc(file) != '\n');
+	else
+		ungetc(ch, file);
+
+	char ext[3] = {0};
+
+	int tmp = fread(ext, 1, sizeof(ext) - 1, file);
+	if (tmp < (int)sizeof(ext) - 1)
+		fatal(QUOTES("%s")" is not a compatible file format", p_path);
+
+	if (strcmp(ext, "TM") != 0)
+		fatal(QUOTES("%s")" is not a compatible file format", p_path);
+
+	if (!fread64_little_endian(p_vm->ip, file))
+		fatal(QUOTES("%s")" is missing an entry point", p_path);
+
+	if (!fread64_little_endian(&p_vm->program_size, file))
+		fatal(QUOTES("%s")" is missing the program size", p_path);
+
+	assert(INST_SIZE == 10);
+
+	SMEMALLOC(p_vm->program, p_vm->program_size);
+
+	for (size_t i = 0; i < p_vm->program_size; ++ i) {
+		uint8_t bytes[INST_SIZE];
+
+		tmp = fread(bytes, 1, sizeof(bytes), file);
+		if (tmp < (int)sizeof(bytes))
+			fatal(QUOTES("%s")" has an incomplete instruction", p_path);
+
+		p_vm->program[i].opcode = bytes[0];
+		p_vm->program[i].reg    = bytes[1];
+		p_vm->program[i].data   = ((uint64_t)bytes[2] << 070) |
+		                          ((uint64_t)bytes[3] << 060) |
+		                          ((uint64_t)bytes[4] << 050) |
+		                          ((uint64_t)bytes[5] << 040) |
+		                          ((uint64_t)bytes[6] << 030) |
+		                          ((uint64_t)bytes[7] << 020) |
+		                          ((uint64_t)bytes[8] << 010) |
+		                          ((uint64_t)bytes[9]);
+	}
+
+	fclose(file);
+}
+
+int vm_exec(vm_t *p_vm) {
+	memset(p_vm->regs, 0, sizeof(p_vm->regs));
+	p_vm->halt = false;
+
+	for (; !p_vm->halt; ++ *p_vm->ip) {
 		if (*p_vm->ip >= p_vm->program_size)
 			vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 		vm_exec_inst(p_vm, &p_vm->program[*p_vm->ip]);
 	}
+
+	SMEMFREE(p_vm->program);
 
 	return p_vm->regs[REG_EX];
 }
@@ -526,53 +588,6 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 
 		break;
 
-	case OPCODE_WRITEF:
-		{
-			word_t addr   = p_vm->regs[REG_1];
-			word_t size   = p_vm->regs[REG_2];
-			word_t count  = p_vm->regs[REG_3];
-			word_t stream = p_vm->regs[REG_4];
-
-			if (addr >= STACK_SIZE || addr + size * count > STACK_SIZE)
-				vm_panic(p_vm, ERR_INVALID_ACCESS);
-
-			/* TODO: implement a file descriptor system and make 'write' write into a file */
-			fwrite(&p_vm->stack[addr], size, count, stream == 2? stderr : stdout); /* 1 = stdin */
-			fflush(stream == 2? stderr : stdout);
-		}
-
-		break;
-
-	case OPCODE_MEMSET:
-		{
-			word_t addr  = p_vm->regs[REG_1];
-			word_t size  = p_vm->regs[REG_2];
-			word_t value = p_vm->regs[REG_3];
-
-			if (addr >= STACK_SIZE || addr + size > STACK_SIZE)
-				vm_panic(p_vm, ERR_INVALID_ACCESS);
-
-			memset(&p_vm->stack[addr], value, size);
-		}
-
-		break;
-
-	case OPCODE_MEMCOPY:
-		{
-			word_t dest = p_vm->regs[REG_1];
-			word_t src  = p_vm->regs[REG_2];
-			word_t size = p_vm->regs[REG_3];
-
-			if (dest >= STACK_SIZE || dest + size > STACK_SIZE)
-				vm_panic(p_vm, ERR_INVALID_ACCESS);
-			else if (src >= STACK_SIZE || src + size > STACK_SIZE)
-				vm_panic(p_vm, ERR_INVALID_ACCESS);
-
-			memcpy(&p_vm->stack[dest], &p_vm->stack[src], size);
-		}
-
-		break;
-
 	case OPCODE_CALL:
 		if (*p_vm->sp + sizeof(word_t) > STACK_SIZE)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
@@ -660,9 +675,71 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 
 		break;
 
-	case OPCODE_DEBUG: vm_dump(p_vm, stdout); break;
-
 	case OPCODE_HALT: p_vm->halt = true; break;
+
+	case OPCODE_SYSCALL:
+	case OPCODE_SYSCALL_R:
+		{
+			syscall_t syscall;
+			if (p_inst->opcode == OPCODE_SYSCALL)
+				syscall = (syscall_t)p_inst->data;
+			else
+				syscall = (syscall_t)*vm_access_reg(p_vm, p_inst->reg);
+
+			switch (syscall) {
+			case SYSCALL_WRITEF:
+				{
+					word_t addr   = p_vm->regs[REG_1];
+					word_t size   = p_vm->regs[REG_2];
+					word_t count  = p_vm->regs[REG_3];
+					word_t stream = p_vm->regs[REG_4];
+
+					if (addr >= STACK_SIZE || addr + size * count > STACK_SIZE)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+
+					/* TODO: implement a file descriptor system and make 'write' write into a file */
+					fwrite(&p_vm->stack[addr], size, count, stream == 2? stderr : stdout);
+					/* 1 = stdin */
+					fflush(stream == 2? stderr : stdout);
+				}
+
+				break;
+
+			case SYSCALL_MEMSET:
+				{
+					word_t addr  = p_vm->regs[REG_1];
+					word_t size  = p_vm->regs[REG_2];
+					word_t value = p_vm->regs[REG_3];
+
+					if (addr >= STACK_SIZE || addr + size > STACK_SIZE)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+
+					memset(&p_vm->stack[addr], value, size);
+				}
+
+				break;
+
+			case SYSCALL_MEMCOPY:
+				{
+					word_t dest = p_vm->regs[REG_1];
+					word_t src  = p_vm->regs[REG_2];
+					word_t size = p_vm->regs[REG_3];
+
+					if (dest >= STACK_SIZE || dest + size > STACK_SIZE)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (src >= STACK_SIZE || src + size > STACK_SIZE)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+
+					memcpy(&p_vm->stack[dest], &p_vm->stack[src], size);
+				}
+
+				break;
+
+			case SYSCALL_DEBUG: vm_dump(p_vm, stdout); break;
+			}
+		}
+
+		break;
 
 	default: vm_panic(p_vm, ERR_UNKNOWN_INSTRUCTION);
 	}

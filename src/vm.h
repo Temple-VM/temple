@@ -4,13 +4,16 @@
 /* TODO: probably split into more files */
 
 #include <stdint.h>  /* uint8_t, uint16_t, uint32_t, uint64_t */
-#include <stdio.h>   /* fprintf, stderr, fputs, fputc, stderr, fwrite, fflush */
+#include <stdio.h>   /* fprintf, stderr, fputs, fputc, stderr, fwrite, fflush,
+                        FILE, fopen, fclose, fgetc, fread */
 #include <stdbool.h> /* bool, true, false */
 #include <stdlib.h>  /* size_t, exit, EXIT_FAILURE, free */
 #include <string.h>  /* memset, memcpy */
 #include <assert.h>  /* assert */
 
 #include "colors.h"
+#include "error.h"
+#include "utils.h"
 
 /* in bytes */
 #define STACK_SIZE 0xFFFF
@@ -149,12 +152,8 @@ typedef enum {
 /*x*/	OPCODE_CALL_F_R, /* jump if false to address in R1, saving the previous ip */
 /*x*/	OPCODE_RET,      /* return to the saved instruction position */
 
-/*x*/	OPCODE_WRITEF, /* write bytes at memory with a given size to a file */
-
-/*x*/	OPCODE_MEMSET,  /* set a region of memory to a certain value */
-/*x*/	OPCODE_MEMCOPY, /* copy a region of memory to another */
-
-/*x*/	OPCODE_DEBUG, /* a function to dumb the stack (temporary) */
+/*x*/	OPCODE_SYSCALL,   /* call a built-in system function by the id */
+/*x*/	OPCODE_SYSCALL_R, /* call a built-in system function by the id in R1 */
 
 /*x*/	OPCODE_HALT = 0xFF /* halt the vm */
 } opcode_t;
@@ -169,6 +168,13 @@ typedef enum {
 	REG_7,
 	REG_8,
 	REG_9,
+	REG_10,
+	REG_11,
+	REG_12,
+	REG_13,
+	REG_14,
+	REG_15,
+
 	REG_AC, /* accumulator register */
 	REG_IP, /* instruction pointer */
 	REG_SP, /* stack pointer */
@@ -187,6 +193,15 @@ typedef enum {
 	ERR_DIV_BY_ZERO
 } err_t;
 
+typedef enum {
+	SYSCALL_WRITEF, /* write bytes at memory with a given size to a file */
+
+	SYSCALL_MEMSET,  /* set a region of memory to a certain value */
+	SYSCALL_MEMCOPY, /* copy a region of memory to another */
+
+	SYSCALL_DEBUG /* a function to dumb the stack (temporary) */
+} syscall_t;
+
 typedef struct {
 	opcode_t opcode: 8; /* making sure these values are EXACTLY 8 bits */
 	reg_t    reg:    8;
@@ -197,8 +212,8 @@ typedef struct {
 	/* little endian is used */
 	uint8_t stack[STACK_SIZE];
 
-	inst_t *program;
-	size_t  program_size;
+	inst_t  *program;
+	uint64_t program_size;
 
 	word_t  regs[REGS_COUNT];
 	word_t *ip, *sp;
@@ -207,7 +222,8 @@ typedef struct {
 } vm_t;
 
 void vm_init(vm_t *p_vm);
-int  vm_exec(vm_t *p_vm, inst_t *p_program, word_t p_program_size, word_t p_entry_point);
+void vm_load_from_file(vm_t *p_vm, const char *p_path);
+int  vm_exec(vm_t *p_vm);
 
 void vm_dump(vm_t *p_vm, FILE *p_stream); /* debug */
 void vm_panic(vm_t *p_vm, err_t p_err);
