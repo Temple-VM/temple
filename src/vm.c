@@ -106,10 +106,12 @@ void vm_panic(vm_t *p_vm, err_t p_err) {
 	fputs(ERR_PREFIX, stderr);
 	set_fg_color(COLOR_DEFAULT);
 
+	fprintclrf(stderr, "\x1bR"ERR_PREFIX"\x1bX");
+
 	switch (p_err) {
 	case ERR_STACK_OVERFLOW:      fputs("Stack overflow\n",  stderr); break;
 	case ERR_STACK_UNDERFLOW:     fputs("Stack underflow\n", stderr); break;
-	case ERR_UNKNOWN_INSTRUCTION: fprintf(stderr, "Unknown instruction $%02x\n",
+	case ERR_UNKNOWN_INSTRUCTION: fprintf(stderr, "Unknown instruction 0x%02x\n",
 	                                      p_vm->program[*p_vm->ip].opcode); break;
 	case ERR_INVALID_ACCESS: fputs("Invalid access\n",   stderr); break;
 	case ERR_DIV_BY_ZERO:    fputs("Division by zero\n", stderr); break;
@@ -124,10 +126,7 @@ void vm_panic(vm_t *p_vm, err_t p_err) {
 	set_fg_color(COLOR_DEFAULT);
 	fputs("  -> at instruction ", stderr);
 
-	set_fg_color(COLOR_BRIGHT_CYAN);
-	fprintf(stderr, "$%017lx\n", (long)*p_vm->ip);
-
-	set_fg_color(COLOR_DEFAULT);
+	fprintclrf(stderr, "  -> At instruction \x1bN0x%017lx\x1bX\n", (long)*p_vm->ip);
 
 	/* debug
 	fputs("\nDebug:\n", stderr);
