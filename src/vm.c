@@ -86,6 +86,7 @@ int vm_exec(vm_t *p_vm) {
 	memcpy(p_vm->static_memory, p_vm->data_segment, p_vm->data_segment_size);
 
 	p_vm->regs[REG_SB] = p_vm->data_segment_size;
+	p_vm->regs[REG_SP] = p_vm->regs[REG_SB];
 
 	for (p_vm->halt = false; !p_vm->halt; ++ *p_vm->ip) {
 		if (*p_vm->ip >= p_vm->program_size)
