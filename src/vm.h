@@ -194,7 +194,7 @@ typedef enum {
 } err_t;
 
 typedef enum {
-	SYSCALL_WRITEF, /* write bytes at memory with a given size to a file */
+	SYSCALL_WRITEF = 0, /* write bytes at memory with a given size to a file */
 
 	SYSCALL_MEMSET,  /* set a region of memory to a certain value */
 	SYSCALL_MEMCOPY, /* copy a region of memory to another */
