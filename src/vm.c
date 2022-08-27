@@ -401,7 +401,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 
 		for (size_t i = REG_1; i < GEN_REGS_COUNT - REG_1; ++ i) {
 			*p_vm->sp -= sizeof(word_t);
-			p_vm->regs[i] = vm_read64(p_vm, *p_vm->sp);
+			p_vm->regs[GEN_REGS_COUNT - i - 1] = vm_read64(p_vm, *p_vm->sp);
 		}
 
 		break;
