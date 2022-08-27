@@ -199,6 +199,8 @@ typedef enum {
 	SYSCALL_MEMSET,  /* set a region of memory to a certain value */
 	SYSCALL_MEMCOPY, /* copy a region of memory to another */
 
+	SYSCALL_FLUSH, /* flush a stream */
+
 	SYSCALL_DEBUG /* a function to dumb the stack (temporary) */
 } syscall_t;
 

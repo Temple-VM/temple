@@ -95,6 +95,9 @@ int vm_exec(vm_t *p_vm) {
 		vm_exec_inst(p_vm, &p_vm->program[*p_vm->ip]);
 	}
 
+	fflush(stdout);
+	fflush(stderr);
+
 	SMEMFREE(p_vm->program);
 	SMEMFREE(p_vm->data_segment);
 
@@ -710,11 +713,11 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 					   make 'write' write into a file */
 					fwrite(&p_vm->static_memory[addr], size, count, stream == 2? stderr : stdout);
 					/* 0 = stdin */
-					fflush(stream == 2? stderr : stdout);
 				}
 
 				break;
 
+			case SYSCALL_FLUSH: fflush(p_vm->regs[REG_1] == 2? stderr : stdout); break;
 			case SYSCALL_MEMSET:
 				{
 					word_t addr  = p_vm->regs[REG_1];
