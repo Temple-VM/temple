@@ -4,7 +4,7 @@
 /* TODO: probably split into more files */
 
 #include <stdint.h>  /* uint8_t, uint16_t, uint32_t, uint64_t */
-#include <stdio.h>   /* fprintf, stderr, fputs, fputc, stderr, fwrite, fflush,
+#include <stdio.h>   /* fprintf, stdout, stdin, stderr, fputs, fputc, fwrite, fflush,
                         FILE, fopen, fclose, fgetc, fread */
 #include <stdbool.h> /* bool, true, false */
 #include <stdlib.h>  /* size_t, exit, EXIT_FAILURE, free */
@@ -19,7 +19,8 @@
 #define STACK_SIZE 0xFFFF
 #define INST_SIZE  10
 
-#define GEN_REGS_COUNT 15
+#define GEN_REGS_COUNT   15
+#define OPEN_FILES_LIMIT 128
 
 #define ERR_PREFIX "[ERROR] "
 
@@ -189,17 +190,22 @@ typedef enum {
 	ERR_STACK_UNDERFLOW,
 	ERR_UNKNOWN_INSTRUCTION,
 	ERR_INVALID_ACCESS,
+	ERR_NO_MORE_FILES,
 	ERR_WRITE_TO_READ_ONLY,
 	ERR_DIV_BY_ZERO
 } err_t;
 
 typedef enum {
 	SYSCALL_WRITEF = 0, /* write bytes at memory with a given size to a file */
+	SYSCALL_READF,      /* read bytes from a file with a given size to memory */
 
 	SYSCALL_MEMSET,  /* set a region of memory to a certain value */
 	SYSCALL_MEMCOPY, /* copy a region of memory to another */
 
 	SYSCALL_FLUSH, /* flush a stream */
+
+	SYSCALL_OPENF,  /* open a file */
+	SYSCALL_CLOSEF, /* close a file */
 
 	SYSCALL_DEBUG /* a function to dumb the stack (temporary) */
 } syscall_t;
@@ -209,6 +215,11 @@ typedef struct {
 	reg_t    reg:    8;
 	word_t   data;
 } inst_t;
+
+typedef struct {
+	bool  reading;
+	FILE *file;
+} stream_t;
 
 typedef struct {
 	/* little endian is used */
@@ -222,6 +233,8 @@ typedef struct {
 
 	uint8_t *data_segment;
 	word_t   data_segment_size;
+
+	stream_t open_files[OPEN_FILES_LIMIT];
 
 	word_t  regs[REGS_COUNT];
 	word_t *ip, *sp;

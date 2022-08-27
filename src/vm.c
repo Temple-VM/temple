@@ -78,6 +78,14 @@ void vm_load_from_file(vm_t *p_vm, const char *p_path) {
 }
 
 int vm_exec(vm_t *p_vm) {
+	memset(p_vm->open_files, 0, sizeof(p_vm->open_files));
+
+	/* init default streams */
+	p_vm->open_files[0].reading = true;
+	p_vm->open_files[0].file    = stdin;
+	p_vm->open_files[1].file    = stdout;
+	p_vm->open_files[2].file    = stderr;
+
 	/* allocate the static memory */
 	uint8_t static_memory[p_vm->data_segment_size + STACK_SIZE];
 	p_vm->static_memory = static_memory;
@@ -97,6 +105,11 @@ int vm_exec(vm_t *p_vm) {
 
 	fflush(stdout);
 	fflush(stderr);
+
+	for (size_t i = 0; i < OPEN_FILES_LIMIT; ++ i) {
+		if (p_vm->open_files[i].file != NULL)
+			fclose(p_vm->open_files[i].file);
+	}
 
 	SMEMFREE(p_vm->program);
 	SMEMFREE(p_vm->data_segment);
@@ -129,8 +142,9 @@ void vm_panic(vm_t *p_vm, err_t p_err) {
 	case ERR_STACK_UNDERFLOW:     fputs("Stack underflow\n", stderr); break;
 	case ERR_UNKNOWN_INSTRUCTION: fprintf(stderr, "Unknown instruction 0x%02x\n",
 	                                      p_vm->program[*p_vm->ip].opcode); break;
-	case ERR_INVALID_ACCESS: fputs("Invalid access\n",   stderr); break;
-	case ERR_DIV_BY_ZERO:    fputs("Division by zero\n", stderr); break;
+	case ERR_INVALID_ACCESS: fputs("Invalid access\n",   stderr);          break;
+	case ERR_NO_MORE_FILES:  fputs("No more files can be open\n", stderr); break;
+	case ERR_DIV_BY_ZERO:    fputs("Division by zero\n", stderr);          break;
 	case ERR_WRITE_TO_READ_ONLY:
 		fputs("Attempt to write into read-only memory\n", stderr);
 
@@ -703,21 +717,44 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 				{
 					word_t addr   = p_vm->regs[REG_1];
 					word_t size   = p_vm->regs[REG_2];
-					word_t count  = p_vm->regs[REG_3];
-					word_t stream = p_vm->regs[REG_4];
+					word_t stream = p_vm->regs[REG_3];
 
-					if (addr >= STACK_SIZE || addr + size * count > STACK_SIZE)
+					if (stream >= OPEN_FILES_LIMIT)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (p_vm->open_files[stream].file == NULL)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (p_vm->open_files[stream].reading)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (addr >= STACK_SIZE || addr + size > STACK_SIZE)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-					/* TODO: implement a file descriptor system and
-					   make 'write' write into a file */
-					fwrite(&p_vm->static_memory[addr], size, count, stream == 2? stderr : stdout);
-					/* 0 = stdin */
+					p_vm->regs[REG_AC] = fwrite(&p_vm->static_memory[addr], 1, size,
+					                            p_vm->open_files[stream].file);
 				}
 
 				break;
 
-			case SYSCALL_FLUSH: fflush(p_vm->regs[REG_1] == 2? stderr : stdout); break;
+			case SYSCALL_READF:
+				{
+					word_t addr   = p_vm->regs[REG_1];
+					word_t size   = p_vm->regs[REG_2];
+					word_t stream = p_vm->regs[REG_3];
+
+					if (stream >= OPEN_FILES_LIMIT)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (p_vm->open_files[stream].file == NULL)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (!p_vm->open_files[stream].reading)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (addr >= STACK_SIZE || addr + size > STACK_SIZE)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+
+					p_vm->regs[REG_AC] = fread(&p_vm->static_memory[addr], 1, size,
+					                           p_vm->open_files[stream].file);
+				}
+
+				break;
+
 			case SYSCALL_MEMSET:
 				{
 					word_t addr  = p_vm->regs[REG_1];
@@ -744,6 +781,66 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 					memcpy(&p_vm->static_memory[dest], &p_vm->static_memory[src], size);
+				}
+
+				break;
+
+			case SYSCALL_FLUSH: /* flushing a stream open for reading is undefined behavior */
+				{
+					word_t stream = p_vm->regs[REG_1];
+
+					if (stream >= OPEN_FILES_LIMIT)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (p_vm->open_files[stream].file == NULL)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (p_vm->open_files[stream].file == NULL)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+
+					fflush(p_vm->open_files[stream].file);
+				}
+
+				break;
+
+			case SYSCALL_OPENF:
+				{
+					word_t addr = p_vm->regs[REG_1];
+					word_t mode = p_vm->regs[REG_2];
+
+					bool found = false;
+					for (size_t i = 0; i < OPEN_FILES_LIMIT; ++ i) {
+						if (p_vm->open_files[i].file == NULL) {
+							found = true;
+
+							p_vm->open_files[i].reading = (bool)mode;
+							p_vm->open_files[i].file    = fopen((char*)&p_vm->static_memory[addr],
+							                                    mode? "r" : "w");
+
+							if (p_vm->open_files[i].file == NULL)
+								p_vm->regs[REG_AC] = 255;
+							else
+								p_vm->regs[REG_AC] = i;
+
+							break;
+						}
+					}
+
+					if (!found)
+						vm_panic(p_vm, ERR_NO_MORE_FILES);
+				}
+
+				break;
+
+			case SYSCALL_CLOSEF:
+				{
+					word_t stream = p_vm->regs[REG_1];
+
+					if (stream >= OPEN_FILES_LIMIT)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+					else if (p_vm->open_files[stream].file == NULL)
+						vm_panic(p_vm, ERR_INVALID_ACCESS);
+
+					fclose(p_vm->open_files[stream].file);
+					p_vm->open_files[stream].file = NULL;
 				}
 
 				break;

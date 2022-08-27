@@ -48,7 +48,7 @@ Everything is explained in that repository.
 - [X] Conditions
 - [X] Console output
 - [X] Data segment
-- [ ] Custom file descriptors system (file I/O)
+- [X] Custom file descriptors system (file I/O)
 - [ ] Loading in shared libraries
 
 ## Documentation
