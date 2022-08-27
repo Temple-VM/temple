@@ -85,9 +85,6 @@ int vm_exec(vm_t *p_vm) {
 	/* copy the data segment into the static memory */
 	memcpy(p_vm->static_memory, p_vm->data_segment, p_vm->data_segment_size);
 
-	/* reset the registers */
-	memset(p_vm->regs, 0, sizeof(p_vm->regs));
-
 	p_vm->regs[REG_SB] = p_vm->data_segment_size;
 
 	for (p_vm->halt = false; !p_vm->halt; ++ *p_vm->ip) {
