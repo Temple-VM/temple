@@ -121,11 +121,6 @@ void vm_dump(vm_t *p_vm, FILE *p_stream) {
 }
 
 void vm_panic(vm_t *p_vm, err_t p_err) {
-	set_fg_color(COLOR_BRIGHT_RED);
-
-	fputs(ERR_PREFIX, stderr);
-	set_fg_color(COLOR_DEFAULT);
-
 	fprintclrf(stderr, "\x1bR"ERR_PREFIX"\x1bX");
 
 	switch (p_err) {
@@ -142,9 +137,6 @@ void vm_panic(vm_t *p_vm, err_t p_err) {
 
 	default: fputs(ERR_PREFIX"Unknown error\n", stderr);
 	}
-
-	set_fg_color(COLOR_DEFAULT);
-	fputs("  -> at instruction ", stderr);
 
 	fprintclrf(stderr, "  -> At instruction \x1bN0x%017lx\x1bX\n", (long)*p_vm->ip);
 
