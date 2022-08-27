@@ -210,10 +210,16 @@ typedef struct {
 
 typedef struct {
 	/* little endian is used */
-	uint8_t stack[STACK_SIZE];
 
-	inst_t  *program;
-	uint64_t program_size;
+	/* static_memory is segmented into the data segment and stack */
+	uint8_t *static_memory;
+	word_t   stack_start, stack_end;
+
+	inst_t *program;
+	word_t  program_size;
+
+	uint8_t *data_segment;
+	word_t   data_segment_size;
 
 	word_t  regs[REGS_COUNT];
 	word_t *ip, *sp;
@@ -230,7 +236,7 @@ void vm_panic(vm_t *p_vm, err_t p_err);
 
 void vm_exec_inst(vm_t *p_vm, inst_t *p_inst);
 
-word_t  *vm_access_reg(vm_t *p_vm, reg_t  p_reg);
+word_t  *vm_access_reg(vm_t *p_vm, reg_t p_reg);
 uint8_t *vm_access_mem(vm_t *p_vm, word_t p_addr, char p_for);
 
 uint8_t  vm_read8(vm_t *p_vm, word_t p_addr);

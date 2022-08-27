@@ -47,7 +47,7 @@ Everything is explained in that repository.
 - [X] Basic instructions (move, push, add, sub)
 - [X] Conditions
 - [X] Console output
-- [ ] Data segment
+- [X] Data segment
 - [ ] Custom file descriptors system (file I/O)
 - [ ] Loading in shared libraries
 

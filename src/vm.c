@@ -38,12 +38,22 @@ void vm_load_from_file(vm_t *p_vm, const char *p_path) {
 	if (!fread64_little_endian(p_vm->ip, file))
 		fatal(QUOTES("%s")" is missing an entry point", p_path);
 
+	if (!fread64_little_endian(&p_vm->data_segment_size, file))
+		fatal(QUOTES("%s")" is missing the data segment size", p_path);
+
 	if (!fread64_little_endian(&p_vm->program_size, file))
 		fatal(QUOTES("%s")" is missing the program size", p_path);
 
 	assert(INST_SIZE == 10);
 
-	SMEMALLOC(p_vm->program, p_vm->program_size);
+	SMEMALLOC(p_vm->data_segment, p_vm->data_segment_size);
+	SMEMALLOC(p_vm->program,      p_vm->program_size);
+
+	for (size_t i = 0; i < p_vm->data_segment_size; ++ i) {
+		tmp = fread(&p_vm->data_segment[i], 1, 1, file);
+		if (tmp < 1)
+			fatal(QUOTES("%s")" got an error while reading data segment", p_path);
+	}
 
 	for (size_t i = 0; i < p_vm->program_size; ++ i) {
 		uint8_t bytes[INST_SIZE];
@@ -68,10 +78,19 @@ void vm_load_from_file(vm_t *p_vm, const char *p_path) {
 }
 
 int vm_exec(vm_t *p_vm) {
-	memset(p_vm->regs, 0, sizeof(p_vm->regs));
-	p_vm->halt = false;
+	/* allocate the static memory */
+	uint8_t static_memory[p_vm->data_segment_size + STACK_SIZE];
+	p_vm->static_memory = static_memory;
 
-	for (; !p_vm->halt; ++ *p_vm->ip) {
+	/* copy the data segment into the static memory */
+	memcpy(p_vm->static_memory, p_vm->data_segment, p_vm->data_segment_size);
+
+	/* reset the registers */
+	memset(p_vm->regs, 0, sizeof(p_vm->regs));
+
+	p_vm->regs[REG_SB] = p_vm->data_segment_size;
+
+	for (p_vm->halt = false; !p_vm->halt; ++ *p_vm->ip) {
 		if (*p_vm->ip >= p_vm->program_size)
 			vm_panic(p_vm, ERR_INVALID_ACCESS);
 
@@ -79,6 +98,7 @@ int vm_exec(vm_t *p_vm) {
 	}
 
 	SMEMFREE(p_vm->program);
+	SMEMFREE(p_vm->data_segment);
 
 	return p_vm->regs[REG_EX];
 }
@@ -93,7 +113,7 @@ void vm_dump(vm_t *p_vm, FILE *p_stream) {
 			if (i != 0 && i % 12 == 0)
 				fputc('\n', p_stream);
 
-			fprintf(p_stream, "%02x ", p_vm->stack[i]);
+			fprintf(p_stream, "%02x ", p_vm->static_memory[i]);
 		}
 	}
 
@@ -696,8 +716,9 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 					if (addr >= STACK_SIZE || addr + size * count > STACK_SIZE)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-					/* TODO: implement a file descriptor system and make 'write' write into a file */
-					fwrite(&p_vm->stack[addr], size, count, stream == 2? stderr : stdout);
+					/* TODO: implement a file descriptor system and
+					   make 'write' write into a file */
+					fwrite(&p_vm->static_memory[addr], size, count, stream == 2? stderr : stdout);
 					/* 1 = stdin */
 					fflush(stream == 2? stderr : stdout);
 				}
@@ -713,7 +734,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 					if (addr >= STACK_SIZE || addr + size > STACK_SIZE)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-					memset(&p_vm->stack[addr], value, size);
+					memset(&p_vm->static_memory[addr], value, size);
 				}
 
 				break;
@@ -729,7 +750,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 					else if (src >= STACK_SIZE || src + size > STACK_SIZE)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-					memcpy(&p_vm->stack[dest], &p_vm->stack[src], size);
+					memcpy(&p_vm->static_memory[dest], &p_vm->static_memory[src], size);
 				}
 
 				break;
@@ -754,7 +775,7 @@ word_t *vm_access_reg(vm_t *p_vm, reg_t p_reg) {
 uint8_t *vm_access_mem(vm_t *p_vm, word_t p_addr, char p_for) {
 	(void)p_vm; (void)p_addr; (void)p_for;
 
-	/* TODO: make a function to access memory either in the stack or in the data segment */
+	/* TODO: make a function to access either static or dynamic memory */
 
 	switch (p_for) {
 	case 'w':
@@ -769,76 +790,76 @@ uint8_t vm_read8(vm_t *p_vm, word_t p_addr) {
 	if (p_addr >= STACK_SIZE)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-	return p_vm->stack[p_addr];
+	return p_vm->static_memory[p_addr];
 }
 
 uint16_t vm_read16(vm_t *p_vm, word_t p_addr) {
 	if (p_addr + 1 >= STACK_SIZE)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-	return ((uint16_t)p_vm->stack[p_addr] << 010) |
-	        (uint16_t)p_vm->stack[p_addr + 1];
+	return ((uint16_t)p_vm->static_memory[p_addr] << 010) |
+	        (uint16_t)p_vm->static_memory[p_addr + 1];
 }
 
 uint32_t vm_read32(vm_t *p_vm, word_t p_addr) {
 	if (p_addr + 3 >= STACK_SIZE)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-	return ((uint32_t)p_vm->stack[p_addr]     << 030) |
-	       ((uint32_t)p_vm->stack[p_addr + 1] << 020) |
-	       ((uint32_t)p_vm->stack[p_addr + 2] << 010) |
-	        (uint32_t)p_vm->stack[p_addr + 3];
+	return ((uint32_t)p_vm->static_memory[p_addr]     << 030) |
+	       ((uint32_t)p_vm->static_memory[p_addr + 1] << 020) |
+	       ((uint32_t)p_vm->static_memory[p_addr + 2] << 010) |
+	        (uint32_t)p_vm->static_memory[p_addr + 3];
 }
 
 uint64_t vm_read64(vm_t *p_vm, word_t p_addr) {
 	if (p_addr + 7 >= STACK_SIZE)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-	return ((uint64_t)p_vm->stack[p_addr]     << 070) |
-	       ((uint64_t)p_vm->stack[p_addr + 1] << 060) |
-	       ((uint64_t)p_vm->stack[p_addr + 2] << 050) |
-	       ((uint64_t)p_vm->stack[p_addr + 3] << 040) |
-	       ((uint64_t)p_vm->stack[p_addr + 4] << 030) |
-	       ((uint64_t)p_vm->stack[p_addr + 5] << 020) |
-	       ((uint64_t)p_vm->stack[p_addr + 6] << 010) |
-	        (uint64_t)p_vm->stack[p_addr + 7];
+	return ((uint64_t)p_vm->static_memory[p_addr]     << 070) |
+	       ((uint64_t)p_vm->static_memory[p_addr + 1] << 060) |
+	       ((uint64_t)p_vm->static_memory[p_addr + 2] << 050) |
+	       ((uint64_t)p_vm->static_memory[p_addr + 3] << 040) |
+	       ((uint64_t)p_vm->static_memory[p_addr + 4] << 030) |
+	       ((uint64_t)p_vm->static_memory[p_addr + 5] << 020) |
+	       ((uint64_t)p_vm->static_memory[p_addr + 6] << 010) |
+	        (uint64_t)p_vm->static_memory[p_addr + 7];
 }
 
 void vm_write8(vm_t *p_vm, word_t p_addr, uint8_t p_data) {
 	if (p_addr >= STACK_SIZE)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-	p_vm->stack[p_addr] = p_data;
+	p_vm->static_memory[p_addr] = p_data;
 }
 
 void vm_write16(vm_t *p_vm, word_t p_addr, uint16_t p_data) {
 	if (p_addr + 1 >= STACK_SIZE)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-	p_vm->stack[p_addr]     = (p_data & 0xFF00) >> 010;
-	p_vm->stack[p_addr + 1] = (p_data & 0x00FF);
+	p_vm->static_memory[p_addr]     = (p_data & 0xFF00) >> 010;
+	p_vm->static_memory[p_addr + 1] = (p_data & 0x00FF);
 }
 
 void vm_write32(vm_t *p_vm, word_t p_addr, uint32_t p_data) {
 	if (p_addr + 3 >= STACK_SIZE)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-	p_vm->stack[p_addr]     = (p_data & 0xFF000000) >> 030;
-	p_vm->stack[p_addr + 1] = (p_data & 0x00FF0000) >> 020;
-	p_vm->stack[p_addr + 2] = (p_data & 0x0000FF00) >> 010;
-	p_vm->stack[p_addr + 3] = (p_data & 0x000000FF);
+	p_vm->static_memory[p_addr]     = (p_data & 0xFF000000) >> 030;
+	p_vm->static_memory[p_addr + 1] = (p_data & 0x00FF0000) >> 020;
+	p_vm->static_memory[p_addr + 2] = (p_data & 0x0000FF00) >> 010;
+	p_vm->static_memory[p_addr + 3] = (p_data & 0x000000FF);
 }
 
 void vm_write64(vm_t *p_vm, word_t p_addr, uint64_t p_data) {
 	if (p_addr + 3 >= STACK_SIZE)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
-	p_vm->stack[p_addr]     = (p_data & 0xFF00000000000000) >> 070;
-	p_vm->stack[p_addr + 1] = (p_data & 0x00FF000000000000) >> 060;
-	p_vm->stack[p_addr + 2] = (p_data & 0x0000FF0000000000) >> 050;
-	p_vm->stack[p_addr + 3] = (p_data & 0x000000FF00000000) >> 040;
-	p_vm->stack[p_addr + 4] = (p_data & 0x00000000FF000000) >> 030;
-	p_vm->stack[p_addr + 5] = (p_data & 0x0000000000FF0000) >> 020;
-	p_vm->stack[p_addr + 6] = (p_data & 0x000000000000FF00) >> 010;
-	p_vm->stack[p_addr + 7] = (p_data & 0x00000000000000FF);
+	p_vm->static_memory[p_addr]     = (p_data & 0xFF00000000000000) >> 070;
+	p_vm->static_memory[p_addr + 1] = (p_data & 0x00FF000000000000) >> 060;
+	p_vm->static_memory[p_addr + 2] = (p_data & 0x0000FF0000000000) >> 050;
+	p_vm->static_memory[p_addr + 3] = (p_data & 0x000000FF00000000) >> 040;
+	p_vm->static_memory[p_addr + 4] = (p_data & 0x00000000FF000000) >> 030;
+	p_vm->static_memory[p_addr + 5] = (p_data & 0x0000000000FF0000) >> 020;
+	p_vm->static_memory[p_addr + 6] = (p_data & 0x000000000000FF00) >> 010;
+	p_vm->static_memory[p_addr + 7] = (p_data & 0x00000000000000FF);
 }
