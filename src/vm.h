@@ -19,7 +19,7 @@
 #define STACK_SIZE 0xFFFF
 #define INST_SIZE  10
 
-#define GEN_REGS_COUNT 9
+#define GEN_REGS_COUNT 15
 
 #define ERR_PREFIX "[ERROR] "
 
