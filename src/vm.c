@@ -719,7 +719,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 					/* TODO: implement a file descriptor system and
 					   make 'write' write into a file */
 					fwrite(&p_vm->static_memory[addr], size, count, stream == 2? stderr : stdout);
-					/* 1 = stdin */
+					/* 0 = stdin */
 					fflush(stream == 2? stderr : stdout);
 				}
 
