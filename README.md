@@ -35,7 +35,7 @@ but it was very bad so i decided to make a new one.
 ```sh
 $ make
 $ make install
-$ ./bin/app
+$ temple
 ```
 
 ## Write a program
