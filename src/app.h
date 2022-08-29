@@ -1,11 +1,11 @@
 #ifndef APP_H__HEADER_GUARD__
 #define APP_H__HEADER_GUARD__
 
-#include <stdio.h>  /* puts, printf */
-#include <stdlib.h> /* size_t */
+#include <stdio.h>   /* puts, printf */
+#include <stdlib.h>  /* size_t */
 #include <stdbool.h> /*bool, true, false */
-#include <string.h> /* strcmp */
-#include <assert.h> /* assert */
+#include <string.h>  /* strcmp */
+#include <assert.h>  /* assert */
 
 #include "error.h"
 #include "vm.h"
