@@ -86,6 +86,9 @@ int vm_exec(vm_t *p_vm) {
 	p_vm->open_files[1].file    = stdout;
 	p_vm->open_files[2].file    = stderr;
 
+	p_vm->stack_start = p_vm->data_segment_size;
+	p_vm->stack_end   = p_vm->data_segment_size + STACK_SIZE;
+
 	/* allocate the static memory */
 	uint8_t static_memory[p_vm->data_segment_size + STACK_SIZE];
 	p_vm->static_memory = static_memory;
@@ -257,7 +260,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_64:
-		if (*p_vm->sp + sizeof(uint64_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(uint64_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write64(p_vm, *p_vm->sp, p_inst->data);
@@ -266,7 +269,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_R_64:
-		if (*p_vm->sp + sizeof(uint64_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(uint64_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write64(p_vm, *p_vm->sp, *vm_access_reg(p_vm, p_inst->reg));
@@ -275,7 +278,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_32:
-		if (*p_vm->sp + sizeof(uint32_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(uint32_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write32(p_vm, *p_vm->sp, p_inst->data);
@@ -284,7 +287,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_R_32:
-		if (*p_vm->sp + sizeof(uint32_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(uint32_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write32(p_vm, *p_vm->sp, *vm_access_reg(p_vm, p_inst->reg));
@@ -293,7 +296,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_16:
-		if (*p_vm->sp + sizeof(uint16_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(uint16_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write16(p_vm, *p_vm->sp, p_inst->data);
@@ -302,7 +305,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_R_16:
-		if (*p_vm->sp + sizeof(uint16_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(uint16_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write16(p_vm, *p_vm->sp, *vm_access_reg(p_vm, p_inst->reg));
@@ -311,7 +314,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_8:
-		if (*p_vm->sp + sizeof(uint8_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(uint8_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write8(p_vm, *p_vm->sp, p_inst->data);
@@ -320,7 +323,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_R_8:
-		if (*p_vm->sp + sizeof(uint8_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(uint8_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write8(p_vm, *p_vm->sp, *vm_access_reg(p_vm, p_inst->reg));
@@ -329,7 +332,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_PUSH_A:
-		if (*p_vm->sp + sizeof(word_t) * GEN_REGS_COUNT > STACK_SIZE)
+		if (*p_vm->sp + sizeof(word_t) * GEN_REGS_COUNT > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		for (size_t i = REG_1; i < GEN_REGS_COUNT - REG_1; ++ i, *p_vm->sp += sizeof(word_t))
@@ -615,7 +618,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_CALL:
-		if (*p_vm->sp + sizeof(word_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(word_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write64(p_vm, *p_vm->sp, p_vm->regs[REG_IP] + 1);
@@ -626,7 +629,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		break;
 
 	case OPCODE_CALL_R:
-		if (*p_vm->sp + sizeof(word_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(word_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write64(p_vm, *p_vm->sp, p_vm->regs[REG_IP] + 1);
@@ -640,7 +643,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		if (p_vm->regs[REG_CN] != 1)
 			break;
 
-		if (*p_vm->sp + sizeof(word_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(word_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write64(p_vm, *p_vm->sp, *p_vm->ip + 1);
@@ -654,7 +657,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		if (p_vm->regs[REG_CN] != 1)
 			break;
 
-		if (*p_vm->sp + sizeof(word_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(word_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write64(p_vm, *p_vm->sp, *p_vm->ip + 1);
@@ -668,7 +671,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		if (p_vm->regs[REG_CN] != 0)
 			break;
 
-		if (*p_vm->sp + sizeof(word_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(word_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write64(p_vm, *p_vm->sp, *p_vm->ip + 1);
@@ -682,7 +685,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 		if (p_vm->regs[REG_CN] != 0)
 			break;
 
-		if (*p_vm->sp + sizeof(word_t) > STACK_SIZE)
+		if (*p_vm->sp + sizeof(word_t) > p_vm->stack_end)
 			vm_panic(p_vm, ERR_STACK_OVERFLOW);
 
 		vm_write64(p_vm, *p_vm->sp, *p_vm->ip + 1);
@@ -725,7 +728,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 					else if (p_vm->open_files[stream].reading)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
-					else if (addr >= STACK_SIZE || addr + size > STACK_SIZE)
+					else if (addr >= p_vm->stack_end || addr + size > p_vm->stack_end)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 					p_vm->regs[REG_AC] = fwrite(&p_vm->static_memory[addr], 1, size,
@@ -746,7 +749,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 					else if (!p_vm->open_files[stream].reading)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
-					else if (addr >= STACK_SIZE || addr + size > STACK_SIZE)
+					else if (addr >= p_vm->stack_end || addr + size > p_vm->stack_end)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 					p_vm->regs[REG_AC] = fread(&p_vm->static_memory[addr], 1, size,
@@ -761,7 +764,7 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 					word_t size  = p_vm->regs[REG_2];
 					word_t value = p_vm->regs[REG_3];
 
-					if (addr >= STACK_SIZE || addr + size > STACK_SIZE)
+					if (addr >= p_vm->stack_end || addr + size > p_vm->stack_end)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 					memset(&p_vm->static_memory[addr], value, size);
@@ -775,9 +778,9 @@ void vm_exec_inst(vm_t *p_vm, inst_t *p_inst) {
 					word_t src  = p_vm->regs[REG_2];
 					word_t size = p_vm->regs[REG_3];
 
-					if (dest >= STACK_SIZE || dest + size > STACK_SIZE)
+					if (dest >= p_vm->stack_end || dest + size > p_vm->stack_end)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
-					else if (src >= STACK_SIZE || src + size > STACK_SIZE)
+					else if (src >= p_vm->stack_end || src + size > p_vm->stack_end)
 						vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 					memcpy(&p_vm->static_memory[dest], &p_vm->static_memory[src], size);
@@ -877,14 +880,14 @@ uint8_t *vm_access_mem(vm_t *p_vm, word_t p_addr, char p_for) {
 }
 
 uint8_t vm_read8(vm_t *p_vm, word_t p_addr) {
-	if (p_addr >= STACK_SIZE)
+	if (p_addr >= p_vm->stack_end)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 	return p_vm->static_memory[p_addr];
 }
 
 uint16_t vm_read16(vm_t *p_vm, word_t p_addr) {
-	if (p_addr + 1 >= STACK_SIZE)
+	if (p_addr + 1 >= p_vm->stack_end)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 	return ((uint16_t)p_vm->static_memory[p_addr] << 010) |
@@ -892,7 +895,7 @@ uint16_t vm_read16(vm_t *p_vm, word_t p_addr) {
 }
 
 uint32_t vm_read32(vm_t *p_vm, word_t p_addr) {
-	if (p_addr + 3 >= STACK_SIZE)
+	if (p_addr + 3 >= p_vm->stack_end)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 	return ((uint32_t)p_vm->static_memory[p_addr]     << 030) |
@@ -902,7 +905,7 @@ uint32_t vm_read32(vm_t *p_vm, word_t p_addr) {
 }
 
 uint64_t vm_read64(vm_t *p_vm, word_t p_addr) {
-	if (p_addr + 7 >= STACK_SIZE)
+	if (p_addr + 7 >= p_vm->stack_end)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 	return ((uint64_t)p_vm->static_memory[p_addr]     << 070) |
@@ -916,14 +919,14 @@ uint64_t vm_read64(vm_t *p_vm, word_t p_addr) {
 }
 
 void vm_write8(vm_t *p_vm, word_t p_addr, uint8_t p_data) {
-	if (p_addr >= STACK_SIZE)
+	if (p_addr >= p_vm->stack_end)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 	p_vm->static_memory[p_addr] = p_data;
 }
 
 void vm_write16(vm_t *p_vm, word_t p_addr, uint16_t p_data) {
-	if (p_addr + 1 >= STACK_SIZE)
+	if (p_addr + 1 >= p_vm->stack_end)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 	p_vm->static_memory[p_addr]     = (p_data & 0xFF00) >> 010;
@@ -931,7 +934,7 @@ void vm_write16(vm_t *p_vm, word_t p_addr, uint16_t p_data) {
 }
 
 void vm_write32(vm_t *p_vm, word_t p_addr, uint32_t p_data) {
-	if (p_addr + 3 >= STACK_SIZE)
+	if (p_addr + 3 >= p_vm->stack_end)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 	p_vm->static_memory[p_addr]     = (p_data & 0xFF000000) >> 030;
@@ -941,7 +944,7 @@ void vm_write32(vm_t *p_vm, word_t p_addr, uint32_t p_data) {
 }
 
 void vm_write64(vm_t *p_vm, word_t p_addr, uint64_t p_data) {
-	if (p_addr + 3 >= STACK_SIZE)
+	if (p_addr + 3 >= p_vm->stack_end)
 		vm_panic(p_vm, ERR_INVALID_ACCESS);
 
 	p_vm->static_memory[p_addr]     = (p_data & 0xFF00000000000000) >> 070;
